@@ -122,6 +122,8 @@ void test_bli_strassen( int m, int n, int k )
     }
 #endif 
 
+#if 0 
+    //wrote this part to test the linear combination + packing routine. 
     dim_t ks = 2; 
     dim_t k_part = k;
 
@@ -170,19 +172,13 @@ void test_bli_strassen( int m, int n, int k )
     bli_obj_create( dt, k_part, n, rsB, csB, &Badd );
     bli_copym( &B0 , &Badd);
    
-    printf("A0: m0 %lld, k0 %lld, offm0 %lld, offk0 %lld\n", m0, k0, offm0, offk0);
-    printf("A1: m1 %lld, k1 %lld, offm1 %lld, offk1 %lld\n", m1, k1, offm1, offk1);
-
-    printf("AAdd: m %lld, k %lld, offm %lld, offk %lld\n", bli_obj_length( &Aadd ), bli_obj_width( &Aadd ), bli_obj_off( BLIS_M, &Aadd ), bli_obj_off( BLIS_N, &Aadd ));
-
-    printf("BAdd: k %lld, n %lld, offm %lld, offk %lld\n", bli_obj_length( &Badd ), bli_obj_width( &Badd ), bli_obj_off( BLIS_M, &Badd ), bli_obj_off( BLIS_N, &Badd ));
+#endif
 
 
     for ( i = 0; i < nrepeats; i ++ ) {
         bl_dgemm_beg = bl_clock();
         {
-            printf("Calling Strassen\n");
-            bli_strassen_ab( alpha, &A0, &B0, beta, &C );
+            bli_strassen_ab( alpha, &A, &B, beta, &C );
         }
         bl_dgemm_time = bl_clock() - bl_dgemm_beg;
 
@@ -196,10 +192,7 @@ void test_bli_strassen( int m, int n, int k )
     for ( i = 0; i < nrepeats; i ++ ) {
         ref_beg = bl_clock();
         {
-            printf("Calling DGEMM\n");
-            bli_addm(&A1, &Aadd);
-            bli_addm(&B1, &Badd);
-            bli_gemm( alpha, &Aadd, &Badd, beta, &C_ref);
+            bli_gemm( alpha, &A, &B, beta, &C_ref);
         }
         ref_time = bl_clock() - ref_beg;
 
