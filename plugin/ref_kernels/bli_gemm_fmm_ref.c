@@ -36,37 +36,24 @@
 #include "blis.h"
 #include STRINGIFY_INT(../PASTEMAC(plugin,BLIS_PNAME_INFIX).h)
 
-// -- Macros to help concisely instantiate bli_func_init() ---------------------
-
-#define gen_func_init_ro( func_p, opname ) \
-do { \
-	bli_func_init( func_p, PASTEMAC(s,opname), PASTEMAC(d,opname), \
-	                       NULL,               NULL ); \
-} while (0)
-
-#define gen_func_init_co( func_p, opname ) \
-do { \
-	bli_func_init( func_p, NULL,               NULL, \
-	                       PASTEMAC(c,opname), PASTEMAC(z,opname) ); \
-} while (0)
-
-#define gen_func_init( func_p, opname ) \
-do { \
-	bli_func_init( func_p, PASTEMAC(s,opname), PASTEMAC(d,opname), \
-	                       PASTEMAC(c,opname), PASTEMAC(z,opname) ); \
-} while (0)
-
-// -----------------------------------------------------------------------------
-
-void PASTEMAC3(plugin_init,BLIS_PNAME_INFIX,BLIS_CNAME_INFIX,BLIS_REF_SUFFIX)( PASTECH2(plugin,BLIS_PNAME_INFIX,_params) )
-{
-	cntx_t* cntx = ( cntx_t* )bli_gks_lookup_id( PASTECH(BLIS_ARCH,BLIS_CNAME_UPPER_INFIX) );
-
-	func_t pack_ukr, gemm_ukr;
-	gen_func_init( &pack_ukr, PASTECH2(packm_fmm,BLIS_CNAME_INFIX,BLIS_REF_SUFFIX) );
-	gen_func_init( &gemm_ukr, PASTECH2(gemm_fmm,BLIS_CNAME_INFIX,BLIS_REF_SUFFIX) );
-
-	bli_cntx_set_ukr( FMM_BLIS_PACK_UKR, &pack_ukr, cntx );
-	bli_cntx_set_ukr( FMM_BLIS_GEMM_UKR, &gemm_ukr, cntx );
+#undef  GENTFUNC
+#define GENTFUNC( ctype, ch, opname, arch, suf ) \
+\
+void PASTEMAC3(ch,opname,arch,suf) \
+     ( \
+             dim_t  m, \
+             dim_t  n, \
+             dim_t  k, \
+       const void*  alpha, \
+       const void*  a, \
+       const void*  b, \
+       const void*  beta, \
+             void*  c, inc_t rs_c, inc_t cs_c, \
+             auxinfo_t* data, \
+       const cntx_t*    cntx  \
+     ) \
+{ \
 }
+
+INSERT_GENTFUNC_BASIC( gemm_fmm, BLIS_CNAME_INFIX, BLIS_REF_SUFFIX )
 

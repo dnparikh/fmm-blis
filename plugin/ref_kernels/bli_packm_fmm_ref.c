@@ -4,6 +4,7 @@
    An object-based framework for developing high-performance BLAS-like
    libraries.
 
+   Copyright (C) 2023, The University of Texas at Austin
    Copyright (C) 2023, Southern Methodist University
 
    Redistribution and use in source and binary forms, with or without
@@ -33,31 +34,34 @@
 */
 
 #include "blis.h"
+#include STRINGIFY_INT(../PASTEMAC(plugin,BLIS_PNAME_INFIX).h)
 
-//
-// Parameters passed to the plugin registration and initialization
-// functions.
-//
-
-#define plugin_fmm-blis_params \
+#undef  GENTFUNC
+#define GENTFUNC( ctype, ch, opname, arch, suf ) \
 \
+void PASTEMAC3(ch,opname,arch,suf) \
+     ( \
+             struc_t strucc, \
+             diag_t  diagc, \
+             uplo_t  uploc, \
+             conj_t  conjc, \
+             pack_t  schema, \
+             bool    invdiag, \
+             dim_t   panel_dim, \
+             dim_t   panel_len, \
+             dim_t   panel_dim_max, \
+             dim_t   panel_len_max, \
+             dim_t   panel_dim_off, \
+             dim_t   panel_len_off, \
+             dim_t   panel_bcast, \
+       const void*   kappa, \
+       const void*   c, inc_t incc, inc_t ldc, \
+             void*   p,             inc_t ldp, \
+       const void*   params, \
+       const cntx_t* cntx  \
+     ) \
+{ \
+}
 
-#define plugin_fmm-blis_params_only \
-\
-
-
-
-//
-// Registration and intialization function prototypes.
-//
-
-#undef GENTCONF
-#define GENTCONF( CONFIG, config ) \
-\
-void PASTEMAC3(plugin_init,BLIS_PNAME_INFIX,_,config)( PASTECH2(plugin,BLIS_PNAME_INFIX,_params) ); \
-void PASTEMAC4(plugin_init,BLIS_PNAME_INFIX,_,config,BLIS_REF_SUFFIX)( PASTECH2(plugin,BLIS_PNAME_INFIX,_params) );
-
-INSERT_GENTCONF
-
-BLIS_EXPORT_BLIS err_t PASTEMAC(plugin_register,BLIS_PNAME_INFIX)( PASTECH2(plugin,BLIS_PNAME_INFIX,_params) );
+INSERT_GENTFUNC_BASIC( packm_fmm, BLIS_CNAME_INFIX, BLIS_REF_SUFFIX )
 

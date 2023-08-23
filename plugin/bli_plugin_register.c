@@ -4,6 +4,7 @@
    An object-based framework for developing high-performance BLAS-like
    libraries.
 
+   Copyright (C) 2023, The University of Texas at Austin
    Copyright (C) 2023, Southern Methodist University
 
    Redistribution and use in source and binary forms, with or without
@@ -35,9 +36,18 @@
 #include "blis.h"
 #include STRINGIFY_INT(PASTEMAC(plugin,BLIS_PNAME_INFIX).h)
 
+siz_t FMM_BLIS_PACK_UKR;
+siz_t FMM_BLIS_GEMM_UKR;
+
 err_t PASTEMAC(plugin_register,BLIS_PNAME_INFIX)( PASTECH2(plugin,BLIS_PNAME_INFIX,_params) )
 {
+	err_t err;
 
+	err = bli_gks_register_ukr(&FMM_BLIS_PACK_UKR);
+	err = bli_gks_register_ukr(&FMM_BLIS_GEMM_UKR);
+
+	if ( err != BLIS_SUCCESS )
+		return err;
 
 	//
 	// Initialize the context for each enabled sub-configuration.
@@ -49,6 +59,6 @@ err_t PASTEMAC(plugin_register,BLIS_PNAME_INFIX)( PASTECH2(plugin,BLIS_PNAME_INF
 
 	INSERT_GENTCONF
 
-	return BLIS_SUCCESS;
+	return err;
 }
 
