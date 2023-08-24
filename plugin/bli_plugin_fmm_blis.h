@@ -52,16 +52,25 @@ extern siz_t FMM_BLIS_GEMM_UKR;
 // Parameter structures for kernels
 //
 
+// The same structure is used for packing and in the micro-kernel, but
+// each packing node and the micro-kernel each get a separate instance with distinct
+// sub-matrices and coefficients.
 typedef struct fmm_params_t
 {
-	dim_t R_L; // = 7; //number of multiplies
-    dim_t num_splits; // number of partitions of each matrix
+	// number of partitions to pack or accumulate
+	dim_t nsplit;
 
-    int* coeff; // ( m_s * k_s ) x R_L matrix
+	// coefficient for each partition (in the computational datatype)
+	void* coef;
 
-    // offsets of the partitions from A0
-    inc_t *row_off;
-    inc_t *col_off;
+	// offsets of the subsequent partitions from the first (nsplit-1 of them)
+	// (when packing, m is the "short micro-panel dimension (m or n)", and n
+	// is the "long micro-panel dimension (k)")
+	inc_t *off_m, *off_n;
+
+	// also keep track of the total matrix size so that we can detect sub-matrix
+	// edge cases
+	dim_t m_max, n_max;
 } fmm_params_t;
 
 //

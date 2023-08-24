@@ -57,11 +57,67 @@ void PASTEMAC3(ch,opname,arch,suf) \
        const void*   kappa, \
        const void*   c, inc_t incc, inc_t ldc, \
              void*   p,             inc_t ldp, \
-       const void*   params, \
+       const void*   params_, \
        const cntx_t* cntx  \
      ) \
 { \
+	const num_t dt = PASTEMAC(ch,type); \
+\
+	fmm_params_t*    params    = ( fmm_params_t* )params_; \
+	packm_cxk_ker_ft packm_def = bli_cntx_get_ukr_dt( dt, BLIS_PACKM_KER, cntx ); \
+\
+	dim_t nsplit = params->nsplit; \
+	ctype* restrict coef = ( ctype* )params->coef; \
+	inc_t* restrict off_m = params->off_m; \
+	inc_t* restrict off_k = params->off_k; \
+	dim_t m_max = params->m_max, k_max = params->k_max; \
+\
+	/* The first sub-matrix also needs a coefficient. */ \
+	ctype kappa_cast, lambda; \
+	kappa_cast = *( ctype* )kappa; \
+	PASTEMAC(ch,scal2s)( kappa_cast, coef[ 0 ], lambda ); \
+\
+	/* First, call the usual packing kernel to pack the first sub-matrix and take
+	   care zeroing out the edges. */ \
+	packm_def \
+	( \
+	  conjc, \
+	  schema, \
+	  panel_dim, \
+	  panel_dim_max, \
+	  panel_bcast, \
+	  panel_len, \
+	  panel_len_max, \
+	  &lambda, \
+	  c, incc, ldc, \
+	  p,       ldp, \
+	  params, \
+	  cntx \
+	); \
+\
+	for ( dim_t k = 1; k < nsplit; k++ ) \
+	{ \
+		const ctype* restrict c_use = ( ctype* )c + off_m[ k-1 ] * incc + off_k[ k-1 ] * ldc; \
+		      ctype* restrict p_use = ( ctype* )p; \
+\
+		PASTEMAC(ch,scal2s)( kappa_cast, coef[ k ], lambda ); \
+\
+		/* Check if we need to shrink the micro-panel due to unequal partitioning. */ \
+		dim_t panel_dim_use = bli_min( panel_dim, m_max - ( panel_dim_off + off_m[ k-1 ] ) ); \
+		dim_t panel_len_use = bli_min( panel_len, k_max - ( panel_len_off + off_k[ k-1 ] ) ); \
+\
+		/* For subsequence sub-matrices, we don't need to re-zero any edges, just accumulate. */ \
+		for ( dim_t j = 0; j < panel_len_use; j++ ) \
+		{ \
+			for ( dim_t i = 0; i < panel_dim_use; i++ ) \
+			for ( dim_t d = 0; d < panel_bcast; d++ ) \
+			{ \
+				PASTEMAC(ch,axpys)( lambda, c_use[ i*incc ], p_use[ i*panel_bcast + d ] ); \
+			} \
+			c_use += ldc; \
+			p_use += ldp; \
+		} \
+	} \
 }
 
 INSERT_GENTFUNC_BASIC( packm_fmm, BLIS_CNAME_INFIX, BLIS_REF_SUFFIX )
-
