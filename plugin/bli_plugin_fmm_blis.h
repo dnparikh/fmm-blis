@@ -63,7 +63,7 @@ typedef struct fmm_params_t
 	// coefficient for each partition (in the computational datatype)
 	void* coef;
 
-	// offsets of the subsequent partitions from the first (nsplit-1 of them)
+	// offsets of each partition relative to the parent matrix
 	// (when packing, m is the "short micro-panel dimension (m or n)", and n
 	// is the "long micro-panel dimension (k)")
 	inc_t *off_m, *off_n;

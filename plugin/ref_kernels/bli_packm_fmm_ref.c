@@ -69,15 +69,22 @@ void PASTEMAC3(ch,opname,arch,suf) \
 	dim_t nsplit = params->nsplit; \
 	ctype* restrict coef = ( ctype* )params->coef; \
 	inc_t* restrict off_m = params->off_m; \
-	inc_t* restrict off_k = params->off_k; \
-	dim_t m_max = params->m_max, k_max = params->k_max; \
+	inc_t* restrict off_k = params->off_n; \
+	dim_t m_max = params->m_max, k_max = params->n_max; \
 \
-	/* The first sub-matrix also needs a coefficient. */ \
+	/* The first sub-matrix also needs a coefficient and offset computation. */ \
 	ctype kappa_cast, lambda; \
 	kappa_cast = *( ctype* )kappa; \
 	PASTEMAC(ch,scal2s)( kappa_cast, coef[ 0 ], lambda ); \
 \
-	/* First, call the usual packing kernel to pack the first sub-matrix and take
+	const ctype* restrict c_use = ( ctype* )c + off_m[ 0 ] * incc + off_k[ 0 ] * ldc; \
+	      ctype* restrict p_use = ( ctype* )p; \
+\
+	/* Check if we need to shrink the micro-panel due to unequal partitioning. */ \
+	dim_t panel_dim_use = bli_min( panel_dim, m_max - ( panel_dim_off + off_m[ 0 ] ) ); \
+	dim_t panel_len_use = bli_min( panel_len, k_max - ( panel_len_off + off_k[ 0 ] ) ); \
+\
+	/* Call the usual packing kernel to pack the first sub-matrix and take
 	   care zeroing out the edges. */ \
 	packm_def \
 	( \
@@ -89,22 +96,22 @@ void PASTEMAC3(ch,opname,arch,suf) \
 	  panel_len, \
 	  panel_len_max, \
 	  &lambda, \
-	  c, incc, ldc, \
-	  p,       ldp, \
+	  c_use, incc, ldc, \
+	  p_use,       ldp, \
 	  params, \
 	  cntx \
 	); \
 \
-	for ( dim_t k = 1; k < nsplit; k++ ) \
+	for ( dim_t s = 1; s < nsplit; s++ ) \
 	{ \
-		const ctype* restrict c_use = ( ctype* )c + off_m[ k-1 ] * incc + off_k[ k-1 ] * ldc; \
-		      ctype* restrict p_use = ( ctype* )p; \
+		PASTEMAC(ch,scal2s)( kappa_cast, coef[ s ], lambda ); \
 \
-		PASTEMAC(ch,scal2s)( kappa_cast, coef[ k ], lambda ); \
+		c_use = ( ctype* )c + off_m[ s ] * incc + off_k[ s ] * ldc; \
+		p_use = ( ctype* )p; \
 \
 		/* Check if we need to shrink the micro-panel due to unequal partitioning. */ \
-		dim_t panel_dim_use = bli_min( panel_dim, m_max - ( panel_dim_off + off_m[ k-1 ] ) ); \
-		dim_t panel_len_use = bli_min( panel_len, k_max - ( panel_len_off + off_k[ k-1 ] ) ); \
+		panel_dim_use = bli_min( panel_dim, m_max - ( panel_dim_off + off_m[ s ] ) ); \
+		panel_len_use = bli_min( panel_len, k_max - ( panel_len_off + off_k[ s ] ) ); \
 \
 		/* For subsequence sub-matrices, we don't need to re-zero any edges, just accumulate. */ \
 		for ( dim_t j = 0; j < panel_len_use; j++ ) \
