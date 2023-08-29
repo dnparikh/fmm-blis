@@ -51,8 +51,13 @@ modules.order
 Module.symvers
 Mkfile.old
 dkms.conf
+installed
 
 
 .DS_STORE
 .clangd
 .vscode
+.cache
+.project
+.settings
+.cproject
