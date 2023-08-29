@@ -2,100 +2,6 @@
 #include "bl_dgemm.h"
 #include <time.h>
 
-void bli_dpackm_lcombination_ker 
-     ( 
-             struc_t strucc, 
-             diag_t  diagc, 
-             uplo_t  uploc, 
-             conj_t  conjc, 
-             pack_t  schema, 
-             bool    invdiag, 
-             dim_t   panel_dim, 
-             dim_t   panel_len, 
-             dim_t   panel_dim_max, 
-             dim_t   panel_len_max, 
-             dim_t   panel_dim_off, 
-             dim_t   panel_len_off, 
-             dim_t   panel_bcast, 
-       const void*   kappa, 
-       const void*   c, inc_t incc, inc_t ldc, 
-             void*   p,             inc_t ldp, 
-       const void*   params, 
-       const cntx_t* cntx  
-     )
-{
-    num_t dt = BLIS_DOUBLE;
-
-    double *pptr = p;
-    double *cptr = c; 
-    double kappa_cast = *(double *) kappa;
-
-    fmm_params_t fmm_params = *(fmm_params_t *)params;
-    dim_t *col_off;
-    dim_t *row_off;
-   
-#if 0
-    printf("A: off_k[0] %lld, off_k[1] %lld, off_m[0] %lld, off_m[1] %lld\n", off_k[0], off_k[1], off_m[0], off_m[1]);
-
-    printf("panel len %lld, panel_dim %lld\n", panel_len, panel_dim);
-    printf("kappa cast %f\n", kappa_cast);
-
-    printf("panel len %lld, panel_dim %lld\n", panel_len, panel_dim);
-    printf("Max panel len %lld, panel_dim %lld\n", panel_len_max, panel_dim_max);
-
-    printf("panel len off %lld, panel_dim_off %lld\n", panel_len_off, panel_dim_off);
-
-    printf("incc %lld, ldc %lld, ldp %lld\n", incc, ldc, ldp);
-
-#endif 
-
-    if ( schema != BLIS_PACKED_ROW_PANELS && 
-		 schema != BLIS_PACKED_COL_PANELS ) 
-		bli_abort(); 
-
-    if ( schema == BLIS_PACKED_ROW_PANELS )
-    {
-        row_off = fmm_params.row_off;
-        col_off = fmm_params.col_off;
-
-    }  
-    else if ( schema == BLIS_PACKED_COL_PANELS )  
-    {
-        row_off = fmm_params.col_off;
-        col_off = fmm_params.row_off;     
-    } 
-
-
-    /* These loops assume that there are only two matrices that need to be added
-    together during packing. This needs to be generalized for the code that 
-    I've started writing in bli_strassen_ab. 
-    Based on the params.coeff we need to determine which matrices need to be 
-    added together and with what coefficients. 
-    */
-    for ( dim_t j = 0; j < panel_len; j++ ) 
-    {
-        for (dim_t i = 0;i < panel_dim;i++) 
-        {
-            //bli_dscal2s( kappa_cast, cptr[ i*incc + j*ldc ], pptr[ i + j*ldp ] ); 
-
-            pptr[ i + j*ldp ] = kappa_cast * 
-                ( cptr[ (i + row_off[0] ) * incc + (j + col_off[0] ) * ldc ] 
-                + cptr[ (i + col_off[1] ) * incc + (j + col_off[1] ) * ldc ] );
-        }
-        for (dim_t i = panel_dim;i < panel_dim_max;i++) 
-            bli_dset0s( pptr[ i + j*ldp ] ); 
-    }   
-    for (dim_t j = panel_len;j < panel_len_max;j++)
-    {
-        for (dim_t i = 0;i < panel_dim_max;i++) 
-        {
-            bli_dset0s( pptr[ i + j*ldp ] ); 
-        }
-    }
-        
-}
- 
-
 void bl_acquire_spart 
      (
              dim_t     row_splits,
@@ -153,6 +59,7 @@ void bli_strassen_ab( obj_t* alpha, obj_t* A, obj_t* B, obj_t* beta, obj_t* C )
 {
 
     bli_init_once();
+    bli_plugin_register_fmm_blis();
 
     cntx_t* cntx = NULL;
     rntm_t* rntm = NULL;
@@ -186,6 +93,19 @@ void bli_strassen_ab( obj_t* alpha, obj_t* A, obj_t* B, obj_t* beta, obj_t* C )
     dim_t m, k, n;
     obj_t A0, B0, C0;
 
+    dim_t m_edge, m_whole, k_edge, k_whole, n_edge, n_whole;
+    dim_t m_splits, k_splits, n_splits;
+
+    // For <2, 2, 2> Strassen -> This needs to be made generic. 
+    m_splits = 2, k_splits = 2, n_splits = 2;
+
+    m_edge = m % ( m_splits * DGEMM_MR );
+    k_edge = k % ( k_splits );
+    n_edge = n % ( n_splits * DGEMM_NR );
+    m_whole = (m - m_edge);
+    k_whole = (k - k_edge); 
+    n_whole = (n - n_edge);
+
     bl_acquire_spart (m_splits, k_splits, 0, 0, A, &A0 );
     bl_acquire_spart (k_splits, n_splits, 0, 0, B, &B0 );
     bl_acquire_spart (m_splits, n_splits, 0, 0, C, &C0 );
@@ -208,17 +128,17 @@ void bli_strassen_ab( obj_t* alpha, obj_t* A, obj_t* B, obj_t* beta, obj_t* C )
 	  &cntl
 	);
 
-
-    // func_t kers;
-    // bli_func_set_dt( &bli_dpackm_lcombination_ker, BLIS_DOUBLE, &kers);
-    
-    bli_gemm_cntl_set_packa_ukr_simple( bli_cntx_get_ukr( FMM_BLIS_PACK_UKR ), &cntl );
-    bli_gemm_cntl_set_packb_ukr_simple( bli_cntx_get_ukr( FMM_BLIS_PACK_UKR ), &cntl );
-
     fmm_params_t paramsA, paramsB, paramsC;
     paramsA.m_max = m; paramsA.n_max = k;
     paramsB.m_max = k; paramsB.n_max = n;
     paramsC.m_max = m; paramsC.n_max = n;
+
+    bli_gemm_cntl_set_packa_ukr_simple( bli_cntx_get_ukrs( FMM_BLIS_PACK_UKR, &cntx ), &cntl );
+    bli_gemm_cntl_set_packb_ukr_simple( bli_cntx_get_ukrs( FMM_BLIS_PACK_UKR, &cntx ), &cntl );
+
+    bli_gemm_cntl_set_packa_params((const void *) &paramsA, &cntl);
+    bli_gemm_cntl_set_packb_params((const void *) &paramsB, &cntl);
+    bli_gemm_cntl_set_params((const void *) &paramsC, &cntl);
 
     // There is probably a better way to define these...?? I don't like this. 
     /*
@@ -325,8 +245,7 @@ void bli_strassen_ab( obj_t* alpha, obj_t* A, obj_t* B, obj_t* beta, obj_t* C )
             }
         }
 
-        bli_gemm_cntl_set_packa_params((const void *) &paramsA, &cntl);
-        bli_gemm_cntl_set_packb_params((const void *) &paramsB, &cntl);
+        
 
 	    // Invoke the internal back-end via the thread handler.
 	    bli_l3_thread_decorator
