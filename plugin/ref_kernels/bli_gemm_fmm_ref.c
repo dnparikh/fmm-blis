@@ -107,7 +107,7 @@ void PASTEMAC3(ch,opname,arch,suf) \
 		/* TODO: we really should keep track of a separate beta for each sub-matrix. */ \
 		PASTEMAC(ch,axpbys_mxn)( m_use, n_use, \
 		                         &lambda, ab, rs_ab, cs_ab, \
-		                         beta, c_use, rs_c, cs_c ); \
+		                         ( void* )beta, c_use, rs_c, cs_c ); \
 	} \
 }
 
