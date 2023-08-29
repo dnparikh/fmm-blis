@@ -2,39 +2,6 @@
 #include "bl_dgemm.h"
 #include <time.h>
 
-#if 0
-Create a packm kernel 
-
-struct_t strucc = BLIS_GENERAL;
-diag_t diagc    = BLIS_NONUNIT_DIAG; 
-uplo_t uploc    = BLIS_DENSE; 
-pack_t schema   = BLIS_PACKED_ROW_PANELS;
-bool invdiag    = FALSE;
-
-dim_t   panel_dim;
-dim_t   panel_len; 
-dim_t   panel_dim_max; 
-dim_t   panel_len_max; 
-dim_t   panel_dim_off; 
-dim_t   panel_len_off; 
-dim_t   panel_bcast; 
-
-#endif	
-
-
-typedef struct fmm_params_t
-{
-	dim_t R_L; // = 7; //number of multiplies
-    dim_t num_splits; // number of partitions of each matrix
-
-    int* coeff; // ( m_s * k_s ) x R_L matrix
-
-    // offsets of the partitions from A0
-    inc_t *row_off; 
-    inc_t *col_off; 
-} fmm_params_t;
-
-
 void bli_dpackm_lcombination_ker 
      ( 
              struc_t strucc, 
@@ -184,9 +151,7 @@ void bl_acquire_spart
 
 void bli_strassen_ab( obj_t* alpha, obj_t* A, obj_t* B, obj_t* beta, obj_t* C )
 {
-#if 0
-    bli_gemm( alpha, A, B, beta, C);
-#else
+
     bli_init_once();
 
     cntx_t* cntx = NULL;
@@ -217,6 +182,17 @@ void bli_strassen_ab( obj_t* alpha, obj_t* A, obj_t* B, obj_t* beta, obj_t* C )
 	// bli_obj_alias_submatrix( A, &A_local );
 	// bli_obj_alias_submatrix( B, &B_local );
 	// bli_obj_alias_submatrix( C, &C_local );
+
+    dim_t m, k, n;
+    obj_t A0, B0, C0;
+
+    bl_acquire_spart (m_splits, k_splits, 0, 0, A, &A0 );
+    bl_acquire_spart (k_splits, n_splits, 0, 0, B, &B0 );
+    bl_acquire_spart (m_splits, n_splits, 0, 0, C, &C0 );
+
+    bli_obj_alias_submatrix( &A0, &A_local );
+	bli_obj_alias_submatrix( &B0, &B_local );
+	bli_obj_alias_submatrix( &C0, &C_local );
     
 	gemm_cntl_t cntl;
 	bli_gemm_cntl_init
@@ -233,52 +209,16 @@ void bli_strassen_ab( obj_t* alpha, obj_t* A, obj_t* B, obj_t* beta, obj_t* C )
 	);
 
 
-    func_t kers;
-    bli_func_set_dt( &bli_dpackm_lcombination_ker, BLIS_DOUBLE, &kers);
-    bli_gemm_cntl_set_packa_ukr_simple( &kers, &cntl );
-    bli_gemm_cntl_set_packb_ukr_simple( &kers, &cntl );
-
-    dim_t m, k, n;
-    dim_t m_edge, m_whole, k_edge, k_whole, n_edge, n_whole;
-    dim_t m_splits, k_splits, n_splits;
-
-    // For <2, 2, 2> Strassen -> This needs to be made generic. 
-
-    m_splits = 2, k_splits = 2, n_splits = 2;
-
-    m = bli_obj_length( C );
-    n = bli_obj_width ( C );
-    k = bli_obj_width ( A );
-
-    // Calculation of edge cases taken from Jianyu's code. 
-    m_edge = m % ( m_splits * DGEMM_MR );
-    k_edge = k % ( k_splits );
-    n_edge = n % ( n_splits * DGEMM_NR );
-    m_whole = (m - m_edge);
-    k_whole = (k - k_edge); 
-    n_whole = (n - n_edge);
-
-    // total splits, which split, source, destination
-    obj_t A0, B0, C0;
-
-    bl_acquire_spart (m_splits, k_splits, 0, 0, A, &A0 );
-    bl_acquire_spart (k_splits, n_splits, 0, 0, B, &B0 );
-    bl_acquire_spart (m_splits, n_splits, 0, 0, C, &C0 );
-
-    bli_obj_alias_submatrix( &A0, &A_local );
-	bli_obj_alias_submatrix( &B0, &B_local );
-	bli_obj_alias_submatrix( &C0, &C_local );
+    // func_t kers;
+    // bli_func_set_dt( &bli_dpackm_lcombination_ker, BLIS_DOUBLE, &kers);
     
+    bli_gemm_cntl_set_packa_ukr_simple( bli_cntx_get_ukr( FMM_BLIS_PACK_UKR ), &cntl );
+    bli_gemm_cntl_set_packb_ukr_simple( bli_cntx_get_ukr( FMM_BLIS_PACK_UKR ), &cntl );
 
     fmm_params_t paramsA, paramsB, paramsC;
-
-    // For <2, 2, 2> Strassen -> This needs to be made generic. 
-    // Having the number of multiplies (R_L) in the params is probably //redundant...
-    paramsA.R_L = 7; paramsA.num_splits = 4; 
-    paramsB.R_L = 7; paramsB.num_splits = 4; 
-    paramsC.R_L = 7; paramsC.num_splits = 4; 
-
-
+    paramsA.m_max = m; paramsA.n_max = k;
+    paramsB.m_max = k; paramsB.n_max = n;
+    paramsC.m_max = m; paramsC.n_max = n;
 
     // There is probably a better way to define these...?? I don't like this. 
     /*
@@ -297,20 +237,20 @@ void bli_strassen_ab( obj_t* alpha, obj_t* A, obj_t* B, obj_t* beta, obj_t* C )
     0 0 1 1 0 -1 1
     0 1 0 0 0 0 -1
     */
+    int U[4][7] = {{ 1,  0,  0,  0,  1,  0,  0}, 
+                   { 1,  0, -1, -1,  0, -1,  0}, 
+                   { 0, -1,  0,  0,  1,  1, -1}, 
+                   { 0,  0, -1,  0,  0,  0, -1} };
 
-    int U[4][7] = {{ 1,  0,  0,  0,  1,  0,  0}, { 1,  0, -1, -1,  0, -1,  0}, { 0, -1,  0,  0,  1,  1, -1}, { 0,  0, -1,  0,  0,  0, -1} };
+    int V[4][7] = { { 1,  0,  0, -1,  1, -1,  0}, 
+                    { 0, -1,  0,  0,  1,  0,  0}, 
+                    { 0,  0, -1,  1,  0,  0,  0}, 
+                    { 0,  1, -1,  0,  0, -1,  1} } ;
 
-    paramsA.coeff = &U[0][0];
-
-    int V[4][7] = { { 1,  0,  0, -1,  1, -1,  0}, { 0, -1,  0,  0,  1,  0,  0}, { 0,  0, -1,  1,  0,  0,  0}, { 0,  1, -1,  0,  0, -1,  1} } ;
-    paramsB.coeff = &V[0][0];
-
-
-    int W[4][7] = {{ 1,  0,  0, -1,  0,  0,  0}, {-1, -1,  0,  0,  1,  1,  0},
-    { 0,  0,  1,  1,  0, -1,  1}, { 0,  1,  0,  0,  0, 0,  1}};
-
-    paramsC.coeff = &W[0][0];
-
+    int W[4][7] = {{ 1,  0,  0, -1,  0,  0,  0}, 
+                   {-1, -1,  0,  0,  1,  1,  0},
+                   { 0,  0,  1,  1,  0, -1,  1}, 
+                   { 0,  1,  0,  0,  0, 0,  1}};
     
     // For matrix A
     // (0,0)
@@ -325,8 +265,6 @@ void bli_strassen_ab( obj_t* alpha, obj_t* A, obj_t* B, obj_t* beta, obj_t* C )
     row_off_A[2] = m_whole/2, col_off_A[2] = 0;
     row_off_A[3] = m_whole/2, col_off_A[3] = k_whole/2;
 
-    paramsA.row_off = row_off_A;
-    paramsA.col_off = col_off_A;
 
     // For Matrix B
     // (0, 0)
@@ -341,10 +279,6 @@ void bli_strassen_ab( obj_t* alpha, obj_t* A, obj_t* B, obj_t* beta, obj_t* C )
     row_off_B[2] = k_whole/2, col_off_B[2] = 0;
     row_off_B[3] = k_whole/2, col_off_B[3] = n_whole/2;
 
-    paramsB.row_off = row_off_B;
-    paramsB.col_off = col_off_B;
-
-
     // For Matrix C
     // (0, 0)
     // (0, n/2)
@@ -358,24 +292,57 @@ void bli_strassen_ab( obj_t* alpha, obj_t* A, obj_t* B, obj_t* beta, obj_t* C )
     row_off_C[2] = m_whole/2, col_off_C[2] = 0;
     row_off_C[3] = m_whole/2, col_off_C[3] = n_whole/2;
 
-    paramsC.row_off = row_off_C;
-    paramsC.col_off = col_off_C;
+    paramsA.nsplits = 0;
+    paramsB.nsplits = 0;
+    paramsC.nsplits = 0;
 
-    bli_gemm_cntl_set_packa_params((const void *) &paramsA, &cntl);
-    bli_gemm_cntl_set_packb_params((const void *) &paramsB, &cntl);
+    for ( dim_t r = 0; r < FMM_BLIS_MULTS; r++ )
+    {
+        for (dim_t isplits = 0; isplits < 4; isplits++)
+        {
+            if(U[isplits][r] != 0)
+            {
+                paramsA.coeff[paramsA.nsplits] = U[isplits][r];
+                paramsA.off_m[paramsA.nsplits] = row_off_A[isplits];
+                paramsA.off_n[paramsA.nsplits] = col_off_A[isplits];
+                paramsA.nsplits++;
+            }
+            if(U[isplits][r] != 0)
+            {
+                //(when packing, m is the "short micro-panel dimension (m or n)
+	            // ", and n is the "long micro-panel dimension (k)")
+                paramsB.coeff[paramsB.nsplits] = V[isplits][r];
+                paramsB.off_m[paramsB.nsplits] = col_off_B[isplits];
+                paramsB.off_n[paramsB.nsplits] = row_off_B[isplits];
+                paramsB.nsplits++;
+            }
+            if(W[isplits][r] != 0)
+            {
+                paramsC.coeff[paramsC.nsplits] = W[isplits][r];
+                paramsC.off_m[paramsC.nsplits] = row_off_C[isplits];
+                paramsC.off_n[paramsC.nsplits] = col_off_C[isplits];
+                paramsC.nsplits++;
+            }
+        }
 
+        bli_gemm_cntl_set_packa_params((const void *) &paramsA, &cntl);
+        bli_gemm_cntl_set_packb_params((const void *) &paramsB, &cntl);
 
-	// Invoke the internal back-end via the thread handler.
-	bli_l3_thread_decorator
-	(
-	  &A_local,
-	  &B_local,
-	  &C_local,
-	  cntx,
-	  ( cntl_t* )&cntl,
-	  rntm
-	);
-#endif 
+	    // Invoke the internal back-end via the thread handler.
+	    bli_l3_thread_decorator
+	    (
+            &A_local,
+            &B_local,
+            &C_local,
+            cntx,
+            ( cntl_t* )&cntl,
+            rntm
+        );
+        
+    }
+
+    
+ 
 
 
 }

@@ -52,6 +52,7 @@ extern siz_t FMM_BLIS_GEMM_UKR;
 // Parameter structures for kernels
 //
 
+#define FMM_BLIS_MULTS 7
 #define FMM_BLIS_MAX_SPLITS 2 // for 1-level Strassen
 
 // The same structure is used for packing and in the micro-kernel, but
