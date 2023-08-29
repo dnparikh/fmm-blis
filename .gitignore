@@ -56,3 +56,7 @@ dkms.conf
 .DS_STORE
 .clangd
 .vscode
+.cache
+.project
+.settings
+.cproject
