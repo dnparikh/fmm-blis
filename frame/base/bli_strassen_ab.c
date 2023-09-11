@@ -1,5 +1,5 @@
-#include "bl_dgemm_kernel.h"
-#include "bl_dgemm.h"
+#include "blis.h"
+#include "bli_fmm.h"
 #include <time.h>
 
 void bl_acquire_spart 
@@ -85,10 +85,6 @@ void bli_strassen_ab( obj_t* alpha, obj_t* A, obj_t* B, obj_t* beta, obj_t* C )
 	obj_t A_local;
 	obj_t B_local;
 	obj_t C_local;
-    // Aliasing the first partition of A, B, and C into the local parameters. 
-	// bli_obj_alias_submatrix( A, &A_local );
-	// bli_obj_alias_submatrix( B, &B_local );
-	// bli_obj_alias_submatrix( C, &C_local );
 
     dim_t m, k, n;
     obj_t A0, B0, C0;
@@ -135,6 +131,7 @@ void bli_strassen_ab( obj_t* alpha, obj_t* A, obj_t* B, obj_t* beta, obj_t* C )
 
     bli_gemm_cntl_set_packa_ukr_simple( bli_cntx_get_ukrs( FMM_BLIS_PACK_UKR, &cntx ), &cntl );
     bli_gemm_cntl_set_packb_ukr_simple( bli_cntx_get_ukrs( FMM_BLIS_PACK_UKR, &cntx ), &cntl );
+    bli_gemm_cntl_set_ukr_simple( bli_cntx_get_ukrs( FMM_BLIS_GEMM_UKR, &cntx ), &cntl );
 
     bli_gemm_cntl_set_packa_params((const void *) &paramsA, &cntl);
     bli_gemm_cntl_set_packb_params((const void *) &paramsB, &cntl);
@@ -212,9 +209,9 @@ void bli_strassen_ab( obj_t* alpha, obj_t* A, obj_t* B, obj_t* beta, obj_t* C )
     row_off_C[2] = m_whole/2, col_off_C[2] = 0;
     row_off_C[3] = m_whole/2, col_off_C[3] = n_whole/2;
 
-    paramsA.nsplits = 0;
-    paramsB.nsplits = 0;
-    paramsC.nsplits = 0;
+    paramsA.nsplit = 0;
+    paramsB.nsplit = 0;
+    paramsC.nsplit = 0;
 
     for ( dim_t r = 0; r < FMM_BLIS_MULTS; r++ )
     {
@@ -222,26 +219,26 @@ void bli_strassen_ab( obj_t* alpha, obj_t* A, obj_t* B, obj_t* beta, obj_t* C )
         {
             if(U[isplits][r] != 0)
             {
-                paramsA.coeff[paramsA.nsplits] = U[isplits][r];
-                paramsA.off_m[paramsA.nsplits] = row_off_A[isplits];
-                paramsA.off_n[paramsA.nsplits] = col_off_A[isplits];
-                paramsA.nsplits++;
+                paramsA.coef[paramsA.nsplit] = U[isplits][r];
+                paramsA.off_m[paramsA.nsplit] = row_off_A[isplits];
+                paramsA.off_n[paramsA.nsplit] = col_off_A[isplits];
+                paramsA.nsplit++;
             }
-            if(U[isplits][r] != 0)
+            if(V[isplits][r] != 0)
             {
                 //(when packing, m is the "short micro-panel dimension (m or n)
 	            // ", and n is the "long micro-panel dimension (k)")
-                paramsB.coeff[paramsB.nsplits] = V[isplits][r];
-                paramsB.off_m[paramsB.nsplits] = col_off_B[isplits];
-                paramsB.off_n[paramsB.nsplits] = row_off_B[isplits];
-                paramsB.nsplits++;
+                paramsB.coef[paramsB.nsplit] = V[isplits][r];
+                paramsB.off_m[paramsB.nsplit] = col_off_B[isplits];
+                paramsB.off_n[paramsB.nsplit] = row_off_B[isplits];
+                paramsB.nsplit++;
             }
             if(W[isplits][r] != 0)
             {
-                paramsC.coeff[paramsC.nsplits] = W[isplits][r];
-                paramsC.off_m[paramsC.nsplits] = row_off_C[isplits];
-                paramsC.off_n[paramsC.nsplits] = col_off_C[isplits];
-                paramsC.nsplits++;
+                paramsC.coeff[paramsC.nsplit] = W[isplits][r];
+                paramsC.off_m[paramsC.nsplit] = row_off_C[isplits];
+                paramsC.off_n[paramsC.nsplit] = col_off_C[isplits];
+                paramsC.nsplit++;
             }
         }
 

@@ -70,8 +70,8 @@ void PASTEMAC3(ch,opname,arch,suf) \
 	inc_t* restrict off_m = params->off_m; \
 	inc_t* restrict off_n = params->off_n; \
 	dim_t m_max = params->m_max, n_max = params->n_max; \
-	dim_t off_m0 = bli_auxinfo_off_m( data ); \
-	dim_t off_n0 = bli_auxinfo_off_n( data ); \
+	dim_t off_m0 = 0;  /*bli_auxinfo_off_m( data );*/ \
+	dim_t off_n0 = 0;  /*bli_auxinfo_off_n( data );*/ \
 \
 	/* Compute the AB product and store in a temporary buffer. */ \
 	/* TODO: optimize passes where only one sub-matrix is written. */ \

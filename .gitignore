@@ -53,6 +53,11 @@ Mkfile.old
 dkms.conf
 installed
 
+# Vim temp files
+*.swp
+
+#directories
+plugin/obj
 
 .DS_STORE
 .clangd

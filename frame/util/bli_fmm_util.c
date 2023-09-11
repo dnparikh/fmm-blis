@@ -1,5 +1,5 @@
-#include "bl_dgemm.h"
-
+#include "blis.h"
+#include "bli_fmm.h"
 
 // XB = XA
 void mkl_copym(
@@ -66,7 +66,7 @@ double *bl_malloc_aligned(
     double *ptr;
     int    err;
 
-    err = posix_memalign( (void**)&ptr, (size_t)GEMM_SIMD_ALIGN_SIZE, size * m * n );
+    err = posix_memalign( (void**)&ptr, (size_t)BLIS_SIMD_ALIGN_SIZE, size * m * n );
 
     if ( err ) {
         printf( "bl_malloc_aligned(): posix_memalign() failures" );
@@ -323,6 +323,8 @@ void bl_dynamic_peeling( int m, int n, int k, double *A, int lda, double *B, int
     int ks = k - kr;
     double *A_extra, *B_extra, *C_extra;
 
+    double one = 1.0;
+
     // Adjust part handled by fast matrix multiplication.
     // Add far column of A outer product bottom row B
     if ( kr > 0 ) {
@@ -331,7 +333,7 @@ void bl_dynamic_peeling( int m, int n, int k, double *A, int lda, double *B, int
         B_extra = &B[ ks + 0  * ldb ];//kr * ns
         C_extra = &C[ 0  + 0  * ldc ];//ms * ns
         if ( ms > 0 && ns > 0 )
-            bl_dgemm( ms, ns, kr, A_extra, lda, B_extra, ldb, C_extra, ldc );
+            bli_dgemm( BLIS_NO_TRANSPOSE, BLIS_NO_TRANSPOSE, ms, ns, kr, &one, A_extra, 1, lda, B_extra, 1, ldb, &one, C_extra, 1, ldc );
     }
 
     // Adjust for far right columns of C
@@ -339,7 +341,7 @@ void bl_dynamic_peeling( int m, int n, int k, double *A, int lda, double *B, int
         // In Strassen, this looks like C(:, 3) = A * B(:, 3)
         B_extra = &B[ 0 + ns * ldb ];//k * nr
         C_extra = &C[ 0 + ns * ldc ];//m * nr
-        bl_dgemm( m, nr, k, A, lda, B_extra, ldb, C_extra, ldc );
+        bli_dgemm( BLIS_NO_TRANSPOSE, BLIS_NO_TRANSPOSE, m, nr, k, &one, A, 1, lda, B_extra, 1, ldb, &one, C_extra, 1, ldc );
     }
 
     // Adjust for bottom rows of C
@@ -349,7 +351,7 @@ void bl_dynamic_peeling( int m, int n, int k, double *A, int lda, double *B, int
         double *B_extra = &B[ 0  + 0 * ldb ];// k  * ns
         double *C_extra = &C[ ms + 0 * ldc ];// mr * ns
         if ( ns > 0 )
-            bl_dgemm( mr, ns, k, A_extra, lda, B_extra, ldb, C_extra, ldc );
+            bli_dgemm( BLIS_NO_TRANSPOSE, BLIS_NO_TRANSPOSE, mr, ns, k, &one, A_extra, 1, lda, B_extra, 1, ldb, &one, C_extra, 1, ldc );
     }
 }
 
