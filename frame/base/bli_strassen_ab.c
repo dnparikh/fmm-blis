@@ -57,9 +57,15 @@ void bl_acquire_spart
 
 void bli_strassen_ab( obj_t* alpha, obj_t* A, obj_t* B, obj_t* beta, obj_t* C )
 {
-
+    err_t err;
     bli_init_once();
-    bli_plugin_register_fmm_blis();
+    err = bli_plugin_register_fmm_blis();
+
+    if (err != BLIS_SUCCESS)
+    {
+        printf("error %d\n",err);
+        bli_abort();
+    }
 
     cntx_t* cntx = NULL;
     rntm_t* rntm = NULL;
@@ -129,9 +135,12 @@ void bli_strassen_ab( obj_t* alpha, obj_t* A, obj_t* B, obj_t* beta, obj_t* C )
     paramsB.m_max = k; paramsB.n_max = n;
     paramsC.m_max = m; paramsC.n_max = n;
 
-    bli_gemm_cntl_set_packa_ukr_simple( bli_cntx_get_ukrs( FMM_BLIS_PACK_UKR, &cntx ), &cntl );
-    bli_gemm_cntl_set_packb_ukr_simple( bli_cntx_get_ukrs( FMM_BLIS_PACK_UKR, &cntx ), &cntl );
-    bli_gemm_cntl_set_ukr_simple( bli_cntx_get_ukrs( FMM_BLIS_GEMM_UKR, &cntx ), &cntl );
+    func_t *pack_ukr;
+
+    pack_ukr = bli_cntx_get_ukrs( FMM_BLIS_PACK_UKR, cntx );
+    bli_gemm_cntl_set_packa_ukr_simple( pack_ukr , &cntl );
+    bli_gemm_cntl_set_packb_ukr_simple( bli_cntx_get_ukrs( FMM_BLIS_PACK_UKR, cntx ), &cntl );
+    bli_gemm_cntl_set_ukr_simple( bli_cntx_get_ukrs( FMM_BLIS_GEMM_UKR, cntx ), &cntl );
 
     bli_gemm_cntl_set_packa_params((const void *) &paramsA, &cntl);
     bli_gemm_cntl_set_packb_params((const void *) &paramsB, &cntl);
@@ -235,14 +244,12 @@ void bli_strassen_ab( obj_t* alpha, obj_t* A, obj_t* B, obj_t* beta, obj_t* C )
             }
             if(W[isplits][r] != 0)
             {
-                paramsC.coeff[paramsC.nsplit] = W[isplits][r];
+                paramsC.coef[paramsC.nsplit] = W[isplits][r];
                 paramsC.off_m[paramsC.nsplit] = row_off_C[isplits];
                 paramsC.off_n[paramsC.nsplit] = col_off_C[isplits];
                 paramsC.nsplit++;
             }
         }
-
-        
 
 	    // Invoke the internal back-end via the thread handler.
 	    bli_l3_thread_decorator
@@ -254,11 +261,7 @@ void bli_strassen_ab( obj_t* alpha, obj_t* A, obj_t* B, obj_t* beta, obj_t* C )
             ( cntl_t* )&cntl,
             rntm
         );
-        
+
     }
-
-    
- 
-
 
 }
