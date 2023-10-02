@@ -90,25 +90,27 @@ void PASTEMAC3(ch,opname,arch,suf) \
 		cntx \
 	); \
 \
-	/* Now loop through the output sub-matrices and accumulate. */ \
+/* 
+	/* Now loop through the output sub-matrices and accumulate. * / \
 	for ( dim_t s = 0; s < nsplit; s++ ) \
 	{ \
-		/* Each sub-matrix also needs a coefficient and offset computation. */ \
+		/* Each sub-matrix also needs a coefficient and offset computation. * / \
 		ctype alpha_cast, lambda; \
 		alpha_cast = *( ctype* )alpha; \
 		PASTEMAC(ch,scal2s)( alpha_cast, coef[ s ], lambda ); \
 \
 		ctype* restrict c_use = ( ctype* )c + off_m[ 0 ] * rs_c + off_n[ 0 ] * cs_c; \
 \
-		/* Check if we need to shrink the micro-panel due to unequal partitioning. */ \
+		/* Check if we need to shrink the micro-panel due to unequal partitioning. * / \
 		dim_t m_use = bli_min( m, m_max - ( off_m0 + off_m[ s ] ) ); \
 		dim_t n_use = bli_min( n, n_max - ( off_n0 + off_n[ s ] ) ); \
 \
-		/* TODO: we really should keep track of a separate beta for each sub-matrix. */ \
+		/* TODO: we really should keep track of a separate beta for each sub-matrix. * / \
 		PASTEMAC(ch,axpbys_mxn)( m_use, n_use, \
 		                         &lambda, ab, rs_ab, cs_ab, \
 		                         ( void* )beta, c_use, rs_c, cs_c ); \
 	} \
+*/ \
 }
 
 INSERT_GENTFUNC_BASIC( gemm_fmm, BLIS_CNAME_INFIX, BLIS_REF_SUFFIX )

@@ -248,9 +248,9 @@ int main( int argc, char *argv[] )
 {
     int    m, n, k;
 
-    m = 500; 
-    n = 500;
-    k = 500;
+    m = 48; 
+    n = 48;
+    k = 48;
 
     // if ( argc != 4 ) {
     //     printf( "Error: require 3 arguments, but only %d provided.\n", argc - 1 );
