@@ -1,5 +1,3 @@
-BLAS_DIR := $(HOME)/blis
-STRASSEN_DIR := ../
 
 # Define the name of the config makefile.
 CONFIG_MK_FILE := plugin/config.mk
@@ -13,6 +11,9 @@ CONFIG_MK_FILE := plugin/config.mk
 #ARCH = gcc-ar-13
 #ARCHFLAGS = cr
 #RANLIB = gcc-ranlib-13
+
+BLIS_INCDIR := $(includedir)/blis
+STRASSEN_DIR := ../
 
 # Define the name of the common makefile.
 COMMON_MK_FILE := $(sharedir)/blis/common.mk
@@ -46,7 +47,7 @@ TEST_SRC = test/test_strassen_oapi.c
 
 OTHER_DEP = 	frame/include/bli_fmm.h 
 
-CFLAGS += $(INC_DIR) -I$(BLAS_DIR)/include/blis/
+CFLAGS += $(INC_DIR) -I$(BLIS_INCDIR)
                              
 FMM_LIB_OBJ=$(FRAME_CC_SRC:.c=.o)
 TEST_OBJ=$(TEST_SRC:.c=.o) 
