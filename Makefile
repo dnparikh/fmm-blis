@@ -10,9 +10,15 @@ CONFIG_MK_FILE := plugin/config.mk
 #CC = gcc-13
 #CXX = g++
 
-ARCH = gcc-ar-13
-ARCHFLAGS = cr
+#ARCH = gcc-ar-13
+#ARCHFLAGS = cr
 #RANLIB = gcc-ranlib-13
+
+# Define the name of the common makefile.
+COMMON_MK_FILE := $(sharedir)/blis/common.mk
+
+# Include the configuration file.
+# include $(COMMON_MK_FILE)
 
 COMPILER_OPT_LEVEL=O0
 
@@ -56,7 +62,8 @@ $(TEST_EXE): $(TEST_OBJ) $(FMM_LIB)
 	$(CC) $(CFLAGS) $(TEST_OBJ) -o $(TEST_EXE) $(LDFLAGS) $(LIBBLIS) $(PLUGIN_LIB) $(FMM_LIB)
 
 $(FMM_LIB): $(FMM_LIB_OBJ)
-	$(ARCH) $(ARCHFLAGS) $@ $(FMM_LIB_OBJ)
+	-mkdir -p lib
+	$(AR) $(ARFLAGS) $@ $(FMM_LIB_OBJ)
 	$(RANLIB) $@
 
 # ---------------------------------------------------------------------------
@@ -68,6 +75,7 @@ $(FMM_LIB): $(FMM_LIB_OBJ)
 # ---------------------------------------------------------------------------
 
 clean:
-	-rm $(FMM_LIB_OBJ) $(FMM_LIB) test/*.o *.x
+	-rm -f $(FMM_LIB_OBJ) $(FMM_LIB) test/*.o *.x
+	-rm -r lib
 	
 #$(MAKE) clean -f Makefile -C test
