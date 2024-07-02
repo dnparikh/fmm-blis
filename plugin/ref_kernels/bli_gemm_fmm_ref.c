@@ -57,7 +57,7 @@ void PASTEMAC3(ch,opname,arch,suf) \
 	const gemm_ukr_ft ukr      = bli_cntx_get_ukr_dt( dt, BLIS_GEMM_UKR, cntx ); \
 	const bool        row_pref = bli_cntx_get_ukr_prefs_dt( dt, BLIS_GEMM_UKR_ROW_PREF, cntx ); \
 	const dim_t       MR       = bli_cntx_get_blksz_def_dt( dt, BLIS_MR, cntx ); \
-	const dim_t       NR       = bli_cntx_get_blksz_def_dt( dt, BLIS_MR, cntx ); \
+	const dim_t       NR       = bli_cntx_get_blksz_def_dt( dt, BLIS_NR, cntx ); \
 \
 	      ctype       ab[ BLIS_STACK_BUF_MAX_SIZE / sizeof(ctype) ]; \
 	const ctype*      zero     = PASTEMAC(ch,0); \
@@ -66,12 +66,18 @@ void PASTEMAC3(ch,opname,arch,suf) \
 \
 	fmm_params_t* params = ( fmm_params_t* )bli_auxinfo_params( data ); \
 	dim_t nsplit = params->nsplit; \
-	ctype* restrict coef = ( ctype* )params->coef; \
+	float* restrict coef = ( float* )params->coef; \
 	inc_t* restrict off_m = params->off_m; \
 	inc_t* restrict off_n = params->off_n; \
+	inc_t* restrict part_m = params->part_m; \
+	inc_t* restrict part_n = params->part_n; \
 	dim_t m_max = params->m_max, n_max = params->n_max; \
-	dim_t off_m0 = 0;  /*bli_auxinfo_off_m( data );*/ \
-	dim_t off_n0 = 0;  /*bli_auxinfo_off_n( data );*/ \
+	dim_t off_m0 = bli_auxinfo_off_m( data );\
+	dim_t off_n0 = bli_auxinfo_off_n( data );\
+	obj_t* C_local = params->local;\
+	inc_t totaloff = ((char*)c - ((char*)(C_local->buffer)))/sizeof(ctype);\
+	dim_t m0 = totaloff/rs_c;\
+	dim_t n0 = totaloff%rs_c;\
 \
 	/* Compute the AB product and store in a temporary buffer. */ \
 	/* TODO: optimize passes where only one sub-matrix is written. */ \
@@ -90,27 +96,28 @@ void PASTEMAC3(ch,opname,arch,suf) \
 		cntx \
 	); \
 \
-/* 
-	/* Now loop through the output sub-matrices and accumulate. * / \
+	ctype* abp = (ctype*) ab;\
+\
 	for ( dim_t s = 0; s < nsplit; s++ ) \
 	{ \
-		/* Each sub-matrix also needs a coefficient and offset computation. * / \
+		\
 		ctype alpha_cast, lambda; \
 		alpha_cast = *( ctype* )alpha; \
-		PASTEMAC(ch,scal2s)( alpha_cast, coef[ s ], lambda ); \
+		PASTEMAC3(ch, s, ch, scal2s)( alpha_cast, coef[ s ], lambda ); \
 \
-		ctype* restrict c_use = ( ctype* )c + off_m[ 0 ] * rs_c + off_n[ 0 ] * cs_c; \
-\
-		/* Check if we need to shrink the micro-panel due to unequal partitioning. * / \
-		dim_t m_use = bli_min( m, m_max - ( off_m0 + off_m[ s ] ) ); \
-		dim_t n_use = bli_min( n, n_max - ( off_n0 + off_n[ s ] ) ); \
-\
-		/* TODO: we really should keep track of a separate beta for each sub-matrix. * / \
+		ctype* restrict c_use = ( ctype* )c + off_m[ s ] * rs_c + off_n[ s ] * cs_c; \
+		\
+		inc_t total_off_m = m0 + off_m[s];\
+		inc_t total_off_n = n0 + off_n[s];\
+		\
+		/*dim_t m_use = bli_min(part_m[s], bli_min( m, m_max - total_off_m ));*/ \
+		/*dim_t n_use = bli_min(part_n[s], bli_min( n, n_max - total_off_n ));*/ \
+		dim_t m_use  = bli_max(0, bli_min(m, part_m[s] - m0 )); \
+		dim_t n_use = bli_max(0, bli_min(n, part_n[s] - n0 )); \
 		PASTEMAC(ch,axpbys_mxn)( m_use, n_use, \
 		                         &lambda, ab, rs_ab, cs_ab, \
 		                         ( void* )beta, c_use, rs_c, cs_c ); \
 	} \
-*/ \
 }
 
 INSERT_GENTFUNC_BASIC( gemm_fmm, BLIS_CNAME_INFIX, BLIS_REF_SUFFIX )

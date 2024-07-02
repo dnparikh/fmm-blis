@@ -53,27 +53,47 @@ extern siz_t FMM_BLIS_GEMM_UKR;
 //
 
 #define FMM_BLIS_MULTS 7
-#define FMM_BLIS_MAX_SPLITS 2 // for 1-level Strassen
+#define MAX_NUM_PARTS 16
+
+typedef struct fmm_s {
+
+    int m_tilde;
+    int n_tilde;
+    int k_tilde;
+    int R;
+
+    int* U;
+    int* V;
+    int* W;
+} fmm_t;
 
 // The same structure is used for packing and in the micro-kernel, but
 // each packing node and the micro-kernel each get a separate instance with distinct
 // sub-matrices and coefficients.
 typedef struct fmm_params_t
 {
+    // int id;
 	// number of partitions to pack or accumulate
 	dim_t nsplit;
 
 	// coefficient for each partition (in the computational datatype)
-	char coef[ sizeof(dcomplex) * FMM_BLIS_MAX_SPLITS ];
+	float coef[ MAX_NUM_PARTS ];
+
+    // size for each partition (in the computational datatype)
+    dim_t part_m[ MAX_NUM_PARTS ];
+    dim_t part_n[ MAX_NUM_PARTS ];
 
 	// offsets of each partition relative to the parent matrix
 	// (when packing, m is the "short micro-panel dimension (m or n)", and n
 	// is the "long micro-panel dimension (k)")
-	inc_t off_m[ FMM_BLIS_MAX_SPLITS ], off_n[ FMM_BLIS_MAX_SPLITS ];
+	inc_t off_m[ MAX_NUM_PARTS ], off_n[ MAX_NUM_PARTS ];
 
 	// also keep track of the total matrix size so that we can detect sub-matrix
 	// edge cases
 	dim_t m_max, n_max;
+
+    //
+    obj_t* local;
 } fmm_params_t;
 
 //
